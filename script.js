@@ -4,6 +4,8 @@ var midi = require('midi');
 
 var transferArray = new Array;
 
+var sendArray = [];
+
 function add8bitToArray(param) {
 
 	var paramType = typeof(param.value);
@@ -217,45 +219,45 @@ var midiConnect = {
 	},
 	output: new midi.output(),
 	input: new midi.input()
-}
-
-// var midi = require('midi');
-
-// // Set up a new input.
-// var input = new midi.input();
-
-// // Count the available input ports.
-// input.getPortCount();
-
-// // Get the name of a specified input port.
-// input.getPortName(0);
-
-// // Configure a callback.
-// input.on('message', function(deltaTime, message) {
-//   console.log('m:' + message + ' d:' + deltaTime);
-// });
-
-// Open the first available input port.
-// input.openPort(0);
-// var midi = require('midi');
-
-// // Set up a new output.
-// var output = new midi.output();
-
-// // Count the available output ports.
-// output.getPortCount();
-
-// // Get the name of a specified output port.
-// output.getPortName(0);
-
-// // Open the first available output port.
-// output.openPort(0);
+};
 
 // Send a MIDI message.
+
+function sendSysexMessages() {
+
+	if (sendArray.length > 0) {
+		var sendingMessage = sendArray[0];
+		//Delete sending message
+		sendArray.splice(0, 1);
+		console.log('Will be send message: ' + sendingMessage);
+		midiConnect.output.sendMessage(sendingMessage);
+
+	} else {
+		console.log('Transfer finish');
+	}
+
+};
 
 window.onload = function() {
 
 	require("nw.gui").Window.get().show();
+
+	midiConnect.init();
+
+	midiConnect.output.openPort(0);
+	midiConnect.input.openPort(0);
+
+	midiConnect.input.ignoreTypes(false, false, false);
+
+	midiConnect.input.on('message', function(deltaTime, message) {
+
+		if (message[1] == 4) {
+			console.log('Transfer ok detect');
+			sendSysexMessages();
+		}
+		// console.log('m:' + message + ' d:' + deltaTime);
+
+	});
 
 	//Перебираем все свойства пресетов
 	for (var key in Preset) {
@@ -278,13 +280,29 @@ window.onload = function() {
 
 	}
 
-	console.log(transferArray);
 
-	// midiConnect.init();
+	// Add listners
+	$('#presetUpload').on('click', function() {
 
-	// //Add listners
-	// $('#presetUpload').on('click', function() {
-	// 	output.sendMessage([144,50,90]);
-	// });
+		//2 byte - action
+		sendArray.push([0xF0, 0, 0]);
+		sendArray.push([0xF0, 0, 1]);
+		//1 byte data syze
+		sendArray.push([0xF0, 0, 4]);
+		//Data
+		sendArray.push([0xF0, 0, 1]);
+		sendArray.push([0xF0, 0, 2]);
+		sendArray.push([0xF0, 0, 3]);
+		sendArray.push([0xF0, 0, 4]);
+
+		//End message action
+		sendArray.push([1, 2, 0xF7]);
+
+		sendSysexMessages();
+
+		// midiConnect.output.sendMessage([144,1,2]);
+
+
+	});
 
 }
