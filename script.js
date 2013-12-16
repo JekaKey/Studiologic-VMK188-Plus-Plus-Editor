@@ -233,6 +233,7 @@ function sendSysexMessages() {
 		midiConnect.output.sendMessage(sendingMessage);
 
 	} else {
+		sendArray = [];
 		console.log('Transfer finish');
 	}
 
@@ -244,8 +245,10 @@ window.onload = function() {
 
 	midiConnect.init();
 
-	midiConnect.output.openPort(0);
-	midiConnect.input.openPort(0);
+	console.log('Port name: ' + midiConnect.output.getPortName(1));
+
+	midiConnect.output.openPort(1);
+	midiConnect.input.openPort(1);
 
 	midiConnect.input.ignoreTypes(false, false, false);
 
@@ -285,18 +288,18 @@ window.onload = function() {
 	$('#presetUpload').on('click', function() {
 
 		//2 byte - action
-		sendArray.push([0xF0, 0, 0]);
+		sendArray.push([0xF0, 1, 2]);
 		sendArray.push([0xF0, 0, 1]);
-		//1 byte data syze
+		// //1 byte data syze
 		sendArray.push([0xF0, 0, 4]);
-		//Data
+		// //Data
 		sendArray.push([0xF0, 0, 1]);
 		sendArray.push([0xF0, 0, 2]);
 		sendArray.push([0xF0, 0, 3]);
 		sendArray.push([0xF0, 0, 4]);
 
 		//End message action
-		sendArray.push([1, 2, 0xF7]);
+		sendArray.push([0xF0,1,0xF7]);
 
 		sendSysexMessages();
 
