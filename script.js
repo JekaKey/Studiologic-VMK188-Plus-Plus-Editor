@@ -1,7 +1,6 @@
 //Require rtmidi library to recive\send midi message
 var midi = require('midi');
 
-
 var transferArray = new Array;
 
 var sendArray = [];
@@ -239,16 +238,49 @@ function sendSysexMessages() {
 
 };
 
+function sendData(command, data) {
+
+	//max command adress
+	if (command > 65535) {
+		alert('Command ' + command + ' not recognize!');
+		return;
+	}
+
+	//2 byte command
+	var command1 = (command & 0xF000)>>12,
+		command2 = (command & 0xF00)>>8,
+		command3 = (command & 0xF0)>>4,
+		command4 = command & 0xF;
+
+	sendArray.push([0xF0, command1, command2]);
+	sendArray.push([0xF0, command3, command4]);
+
+	// //1 byte data syze
+	sendArray.push([0xF0, 0, 4]);
+
+	// //Data
+	sendArray.push([0xF0, 0, 1]);
+	sendArray.push([0xF0, 0, 2]);
+	sendArray.push([0xF0, 0, 3]);
+	sendArray.push([0xF0, 0, 4]);
+
+	//End message action
+	sendArray.push([0xF0, 1, 0xF7]);
+
+	sendSysexMessages();
+
+}
+
 window.onload = function() {
 
 	require("nw.gui").Window.get().show();
 
 	midiConnect.init();
 
-	console.log('Port name: ' + midiConnect.output.getPortName(1));
+	console.log('Port name: ' + midiConnect.output.getPortName(0));
 
-	midiConnect.output.openPort(1);
-	midiConnect.input.openPort(1);
+	midiConnect.output.openPort(0);
+	midiConnect.input.openPort(0);
 
 	midiConnect.input.ignoreTypes(false, false, false);
 
@@ -285,27 +317,19 @@ window.onload = function() {
 
 
 	// Add listners
-	$('#presetUpload').on('click', function() {
-
-		//2 byte - action
-		sendArray.push([0xF0, 1, 2]);
-		sendArray.push([0xF0, 0, 1]);
-		// //1 byte data syze
-		sendArray.push([0xF0, 0, 4]);
-		// //Data
-		sendArray.push([0xF0, 0, 1]);
-		sendArray.push([0xF0, 0, 2]);
-		sendArray.push([0xF0, 0, 3]);
-		sendArray.push([0xF0, 0, 4]);
-
-		//End message action
-		sendArray.push([0xF0,1,0xF7]);
-
-		sendSysexMessages();
-
-		// midiConnect.output.sendMessage([144,1,2]);
-
-
+	$('#led1').on('click', function() {
+		sendData(1, [1, 2, 3, 4]);
 	});
+	$('#led2').on('click', function() {
+		sendData(2, [1, 2, 3, 4]);
+	});
+	$('#led3').on('click', function() {
+		sendData(3, [1, 2, 3, 4]);
+	});
+	$('#led4').on('click', function() {
+		sendData(4, [1, 2, 3, 4]);
+	});
+
+
 
 }
