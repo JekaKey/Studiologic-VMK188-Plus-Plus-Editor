@@ -286,11 +286,12 @@ window.onload = function() {
 
 	midiConnect.input.on('message', function(deltaTime, message) {
 
-		if (message[1] == 4) {
+		if (message[1] == 0 && message[2] == 1) {
 			console.log('Transfer ok detect');
 			sendSysexMessages();
 		}
-		// console.log('m:' + message + ' d:' + deltaTime);
+
+		console.log('m:' + message + ' d:' + deltaTime);
 
 	});
 
