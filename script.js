@@ -1,11 +1,11 @@
-//Require rtmidi library to recive\send midi message
-var midi = require('midi'),
-	gui = require("nw.gui").Window.get().show();
+var gui = require("nw.gui").Window.get().show(),
+	midi = require('midi'),
+	Twig = require('twig'),
+    twig = Twig.twig;    
 
 const portName = 'VMK188++'; //Midi port name
 
-var transferArray = new Array;
-
+var transferArray = [];
 var sendArray = [];
 
 function add8bitToArray(param) {
@@ -16,7 +16,11 @@ function add8bitToArray(param) {
 		case 'number':
 
 			for (var i = 0; i < param.size; i++) {
-				transferArray.push(param.value);
+
+				var value = (param.value>>(8*i)) & 0xFF;
+
+				transferArray.push(value);
+
 			}
 
 			break;
@@ -24,7 +28,7 @@ function add8bitToArray(param) {
 			for (var i = 0; i < param.size; i++) {
 
 				if (param.value[i])
-					transferArray.push(param.value[i]);
+					transferArray.push(param.value[i].charCodeAt(0));
 				else
 					transferArray.push(0);
 
@@ -224,16 +228,106 @@ var Preset = {
 	dawbutton3: new button(),
 	dawbutton4: new button(),
 	dawbutton5: new button()
-};
+}
 
-var functionInvmk = {};
-
-functionInvmk['id'] = 100;
-functionInvmk['name'] = 101;
-functionInvmk['midiChannel'] = 102;
-functionInvmk['highResMidiEnable'] = 103;
-functionInvmk['analogMidiEnable'] = 104;
-
+var calibration = {
+	pedal1_min: {
+		value: 0,
+		size: 2
+	},
+	pedal1_max: {
+		value: 0,
+		size: 2
+	},
+	pedal2_min: {
+		value: 300,
+		size: 2
+	},
+	pedal2_max: {
+		value: 2000,
+		size: 2
+	},
+	pedal3_min: {
+		value: 0,
+		size: 2
+	},
+	pedal3_max: {
+		value: 0,
+		size: 2
+	},
+	slider0_min: {
+		value: 0,
+		size: 2
+	},
+	slider0_max: {
+		value: 0,
+		size: 2
+	},
+	slider1_min: {
+		value: 0,
+		size: 2
+	},
+	slider1_max: {
+		value: 0,
+		size: 2
+	},
+	slider2_min: {
+		value: 0,
+		size: 2
+	},
+	slider2_max: {
+		value: 0,
+		size: 2
+	},
+	slider3_min: {
+		value: 0,
+		size: 2
+	},
+	slider3_max: {
+		value: 0,
+		size: 2
+	},
+	slider4_min: {
+		value: 0,
+		size: 2
+	},
+	slider4_max: {
+		value: 0,
+		size: 2
+	},
+	slider5_min: {
+		value: 0,
+		size: 2
+	},
+	slider5_max: {
+		value: 0,
+		size: 2
+	},
+	slider6_min: {
+		value: 0,
+		size: 2
+	},
+	slider6_max: {
+		value: 0,
+		size: 2
+	},
+	slider7_min: {
+		value: 0,
+		size: 2
+	},
+	slider7_max: {
+		value: 0,
+		size: 2
+	},
+	slider8_min: {
+		value: 0,
+		size: 2
+	},
+	slider8_max: {
+		value: 0,
+		size: 2
+	}
+}
 
 var midiConnect = {
 	init: function() {
@@ -275,14 +369,13 @@ var midiConnect = {
 };
 
 // Send a MIDI message.
-
 function sendSysexMessages() {
 
 	if (sendArray.length > 0) {
 		var sendingMessage = sendArray[0];
 		//Delete sending message
 		sendArray.splice(0, 1);
-		console.log('Will be send message: ' + sendingMessage);
+		//console.log('Will be send message: ' + sendingMessage);
 		midiConnect.output.sendMessage(sendingMessage);
 
 	} else {
@@ -293,7 +386,6 @@ function sendSysexMessages() {
 };
 
 function sendData(command, data) {
-
 	//max command adress
 	if (command > 65535) {
 		alert('Command ' + command + ' not recognize!');
@@ -301,22 +393,25 @@ function sendData(command, data) {
 	}
 
 	//2 byte command
-	var command1 = (command & 0xF000) >> 12,
-		command2 = (command & 0xF00) >> 8,
-		command3 = (command & 0xF0) >> 4,
-		command4 = command & 0xF;
+	var command4 = (command & 0xF000) >> 12,
+		command3 = (command & 0xF00) >> 8,
+		command2 = (command & 0xF0) >> 4,
+		command1 = command & 0xF;
 
 	sendArray.push([0xF0, command1, command2]);
 	sendArray.push([0xF0, command3, command4]);
 
 	//1 byte data syze
-	sendArray.push([0xF0, 0, 4]);
+	if (data && data.length > 0) {
+		sendArray.push([0xF0, data.length&0xF, (data.length>>4)&0xF]);
+	}
 
 	//Data
-	sendArray.push([0xF0, 0, 1]);
-	sendArray.push([0xF0, 0, 2]);
-	sendArray.push([0xF0, 0, 3]);
-	sendArray.push([0xF0, 0, 4]);
+	if (data && data.length > 0) {
+		for (var i = 0; i < data.length; i++) {
+			sendArray.push([0xF0, data[i]&0xF, (data[i]>>4)&0xF]);
+		}
+	}
 
 	//End message action
 	sendArray.push([0xF0, 1, 0xF7]);
@@ -338,41 +433,54 @@ window.onload = function() {
 	midiConnect.input.on('message', function(deltaTime, message) {
 
 		if (message[1] == 0 && message[2] == 1) {
-			console.log('Transfer ok detect');
+			// console.log('Transfer ok detect');
 			sendSysexMessages();
 		}
 
-		console.log('m:' + message + ' d:' + deltaTime);
+		//console.log('m:' + message + ' d:' + deltaTime);
 
 	});
 
 	// Add listners
 	$('#led1').on('click', function() {
-		sendData(1, [1, 2, 3, 4]);
+		sendData(1, [1,192, 240]);
+		sendSysexMessages();
 	});
 	$('#led2').on('click', function() {
-		sendData(2, [1, 2, 3, 4]);
+		sendData(2, [50]);
+		sendSysexMessages();
 	});
 	$('#led3').on('click', function() {
-		sendData(3, [1, 2, 3, 4]);
+		sendData(3, [70]);
+		sendSysexMessages();
 	});
 	$('#led4').on('click', function() {
-		sendData(4, [1, 2, 3, 4]);
+		sendData(4, [240]);
+		sendSysexMessages();
 	});
 
+	$('#colibrationUpload').on('click', function() {
+		//Flush array
+		transferArray = [];
+
+		sendData(1);
+
+		sendData(4);
+
+		sendSysexMessages();
+
+	});
 
 	$('#presetUpload').on('click', function() {
+
+		//Flush array
+		transferArray = [];
+
 		//Перебираем все свойства пресетов
 		for (var key in Preset) {
 			if (!Preset.hasOwnProperty(key)) continue;
 
 			var PresValue = Preset[key];
-
-			if (functionInvmk[key] > 0) {
-
-				console.log('yes');
-
-			}
 
 			if (PresValue.hasOwnProperty('value')) {
 
@@ -389,6 +497,29 @@ window.onload = function() {
 
 		}
 
+		sendData(1);
+		//Load 1 preset
+		sendData(100);
+
+		for(var i = 0; i < transferArray.length; i++) {
+
+			var buf = 1,
+				adress = i;
+
+			if (i > 255) {
+				buf = 2;
+				adress = adress&0xFF;
+			}
+
+			sendData(101, [buf, adress, transferArray[i]]);
+
+		}
+
+		//Save first preset
+		sendData(102);
+		sendData(2);
+
+		sendSysexMessages();
 
 	});
 
