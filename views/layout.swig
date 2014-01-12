@@ -11,7 +11,7 @@
     </div>
 </div>
 
-<nav class="navbar navbar-default" role="navigation">
+<nav class="navbar navbar-default navbar-fixed-top" style="margin-top: 51px;" role="navigation">
 
     <div class="container" id="main-nav">
         <ul class="nav navbar-nav">
@@ -25,6 +25,5 @@
 </nav>
 
 <div class="container" id="main-content">
-    <h1>Main Page</h1>
 </div>
 

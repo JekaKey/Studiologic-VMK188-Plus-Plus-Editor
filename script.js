@@ -1,50 +1,45 @@
 var gui = require("nw.gui").Window.get().show(),
+    platform = require("os").platform,
     midi = require('midi'),
     swig = require('swig');
 
 const portName = 'VMK188++'; //Midi port name
 
-var transferArray = [];
-var sendArray = [];
+Array.prototype.pushChar = function (value, size) {
 
-function add8bitToArray(param) {
-
-    var paramType = typeof(param.value);
+    var paramType = typeof(value);
 
     switch (paramType) {
         case 'number':
 
-            for (var i = 0; i < param.size; i++) {
-
-                var value = (param.value >> (8 * i)) & 0xFF;
-
-                transferArray.push(value);
-
+            for (var i = 0; i < size; i++) {
+                var partValue = (value >> (8 * i)) & 0xFF;
+                this.push(partValue);
             }
 
             break;
         case 'string':
-            for (var i = 0; i < param.size; i++) {
+            for (var i = 0; i < size; i++) {
 
-                if (param.value[i])
-                    transferArray.push(param.value[i].charCodeAt(0));
+                if (value[i])
+                    this.push(value[i].charCodeAt(0));
                 else
-                    transferArray.push(0);
+                    this.push(0);
 
             }
             break;
         case 'boolean':
-            transferArray.push(param.value & 1);
+
+            this.push(value & 1);
+
             break;
         default:
-            console.error('Unresolve params type: ' + paramType, param);
+            console.error('Unresolve params type: ' + paramType, value);
             break;
     }
-
-}
+};
 
 //Settings for slider,rotator
-
 function slider() {
     this.active = {
         value: 1,
@@ -229,108 +224,10 @@ var Preset = {
     dawbutton5: new button()
 }
 
-var calibration = {
-    pedal1_min: {
-        value: 0,
-        size: 2
-    },
-    pedal1_max: {
-        value: 0,
-        size: 2
-    },
-    pedal2_min: {
-        value: 300,
-        size: 2
-    },
-    pedal2_max: {
-        value: 2000,
-        size: 2
-    },
-    pedal3_min: {
-        value: 0,
-        size: 2
-    },
-    pedal3_max: {
-        value: 0,
-        size: 2
-    },
-    slider0_min: {
-        value: 0,
-        size: 2
-    },
-    slider0_max: {
-        value: 0,
-        size: 2
-    },
-    slider1_min: {
-        value: 0,
-        size: 2
-    },
-    slider1_max: {
-        value: 0,
-        size: 2
-    },
-    slider2_min: {
-        value: 0,
-        size: 2
-    },
-    slider2_max: {
-        value: 0,
-        size: 2
-    },
-    slider3_min: {
-        value: 0,
-        size: 2
-    },
-    slider3_max: {
-        value: 0,
-        size: 2
-    },
-    slider4_min: {
-        value: 0,
-        size: 2
-    },
-    slider4_max: {
-        value: 0,
-        size: 2
-    },
-    slider5_min: {
-        value: 0,
-        size: 2
-    },
-    slider5_max: {
-        value: 0,
-        size: 2
-    },
-    slider6_min: {
-        value: 0,
-        size: 2
-    },
-    slider6_max: {
-        value: 0,
-        size: 2
-    },
-    slider7_min: {
-        value: 0,
-        size: 2
-    },
-    slider7_max: {
-        value: 0,
-        size: 2
-    },
-    slider8_min: {
-        value: 0,
-        size: 2
-    },
-    slider8_max: {
-        value: 0,
-        size: 2
-    }
-}
-
 var midiConnect = {
     init: function () {
-        console.log('await port');
+        var that = this;
+        console.log('Search port...');
 
         var response = false;
 
@@ -359,77 +256,181 @@ var midiConnect = {
 
         }
 
-        this.input.ignoreTypes(false, false, false);
+        if (response) {
+            this.input.ignoreTypes(false, false, false);
+            this.input.on('message', that.sysexInputEvent);
+        }
 
         return response;
     },
     output: new midi.output(),
-    input: new midi.input()
-};
-
-// Send a MIDI message.
-
-function sendSysexMessages() {
-
-    if (sendArray.length > 0) {
-        var sendingMessage = sendArray[0];
-        //Delete sending message
-        sendArray.splice(0, 1);
-        //console.log('Will be send message: ' + sendingMessage);
-        midiConnect.output.sendMessage(sendingMessage);
-
-    } else {
-        sendArray = [];
-        console.log('Transfer finish');
-    }
-
-};
-
-function sendData(command, data) {
-    //max command adress
-    if (command > 65535) {
-        alert('Command ' + command + ' not recognize!');
-        return;
-    }
-
-    //2 byte command
-    var command4 = (command & 0xF000) >> 12,
-        command3 = (command & 0xF00) >> 8,
-        command2 = (command & 0xF0) >> 4,
-        command1 = command & 0xF;
-
-    sendArray.push([0xF0, command1, command2]);
-    sendArray.push([0xF0, command3, command4]);
-
-    //1 byte data syze
-    if (data && data.length > 0) {
-        sendArray.push([0xF0, data.length & 0xF, (data.length >> 4) & 0xF]);
-    }
-
-    //Data
-    if (data && data.length > 0) {
-        for (var i = 0; i < data.length; i++) {
-            sendArray.push([0xF0, data[i] & 0xF, (data[i] >> 4) & 0xF]);
+    input: new midi.input(),
+    sysexPushCommand: function (command, data) {
+        //max command adress
+        if (command > 65535) {
+            alert('Command ' + command + ' not recognize!');
+            return;
         }
+
+        //2 byte command
+        var command4 = (command & 0xF000) >> 12,
+            command3 = (command & 0xF00) >> 8,
+            command2 = (command & 0xF0) >> 4,
+            command1 = command & 0xF;
+
+        this.sysexOutput.push([0xF0, command1, command2]);
+        this.sysexOutput.push([0xF0, command3, command4]);
+
+        //1 byte data size
+        if (data && data.length > 0) {
+            this.sysexOutput.push([0xF0, data.length & 0xF, (data.length >> 4) & 0xF]);
+        }
+
+        //Data
+        if (data && data.length > 0) {
+            for (var i = 0; i < data.length; i++) {
+                this.sysexOutput.push([0xF0, data[i] & 0xF, (data[i] >> 4) & 0xF]);
+            }
+        }
+
+        //End message action
+        this.sysexOutput.push([0xF0, 1, 0xF7]);
+
+    },
+    sysexInput: new Array(),
+    sysexOutput: new Array(),
+    sysexSend: function () {
+
+        if (this.sysexOutput.length > 0) {
+            var sendingMessage = this.sysexOutput[0];
+
+            //Delete sending message
+            this.sysexOutput.splice(0, 1);
+            this.output.sendMessage(sendingMessage);
+
+        } else {
+            this.sysexOutput = [];
+            console.log('Transfer finish');
+            console.timeEnd('Command time');
+        }
+    },
+    sysexInputEvent: function (deltaTime, message) {
+
+        console.log('deltaTime:', deltaTime, message);
+
+        if (message[1] == 0 && message[2] == 1) {
+            midiConnect.sysexSend();
+        }
+
     }
-
-    //End message action
-    sendArray.push([0xF0, 1, 0xF7]);
-
-    // sendSysexMessages();
-
-}
+};
 
 window.onload = function () {
 
+    console.log(platform());
+
+    if (midiConnect.init()) {
+        console.log('Port init success');
+    } else {
+        alert('Port VMK188++ not found!');
+    }
+
     $('body').html(swig.renderFile('./views/layout.swig'));
 
-    //Button event
+    window.calibration = {
+        send: function () {
+            var that = this,
+                sendArray = [];
+
+            //Update actual data
+            $('#main-content .calibration input').each(function () {
+                that.data[$(this).data('name')][$(this).data('type')] = Number($(this).val());
+            });
+
+            for (var key in this.data) {
+//                sendArray.pushChar(Number(this.data[key]['min']), 2);
+//                sendArray.pushChar(Number(this.data[key]['max']), 2);
+            }
+            console.time('Command time');
+            midiConnect.sysexPushCommand(1);
+            midiConnect.sysexSend();
+        },
+        "data": {
+            "pedal1": {
+                "name": "Pedal 1", "min": 2, "max": 20
+            },
+            "pedal2": {
+                "name": "Pedal 2", "min": 2, "max": 20
+            },
+            "pedal3": {
+                "name": "Pedal 3", "min": 2, "max": 20
+            },
+            "pitch": {
+                "name": "Pitch", "min": 2, "max": 20
+            },
+            "modulation": {
+                "name": "Modulation", "min": 2, "max": 20
+            },
+            "slider0": {
+                "name": "Slider 0", "min": 2, "max": 20
+            },
+            "slider1": {
+                "name": "Slider 1", "min": 2, "max": 20
+            },
+            "slider2": {
+                "name": "Slider 2", "min": 2, "max": 20
+            },
+            "slider3": {
+                "name": "Slider 3", "min": 2, "max": 20
+            },
+            "slider4": {
+                "name": "Slider 4", "min": 2, "max": 20
+            },
+            "slider5": {
+                "name": "Slider 5", "min": 2, "max": 20
+            },
+            "slider6": {
+                "name": "Slider 6", "min": 2, "max": 20
+            },
+            "slider7": {
+                "name": "Slider 7", "min": 2, "max": 20
+            },
+            "slider8": {
+                "name": "Slider 8", "min": 2, "max": 20
+            },
+            "rotator1": {
+                "name": "Rotator 1", "min": 2, "max": 20
+            },
+            "rotator2": {
+                "name": "Rotator 2", "min": 2, "max": 20
+            },
+            "rotator3": {
+                "name": "Rotator 3", "min": 2, "max": 20
+            },
+            "rotator4": {
+                "name": "Rotator 4", "min": 2, "max": 20
+            },
+            "rotator5": {
+                "name": "Rotator 5", "min": 2, "max": 20
+            },
+            "rotator6": {
+                "name": "Rotator 6", "min": 2, "max": 20
+            },
+            "rotator7": {
+                "name": "Rotator 7", "min": 2, "max": 20
+            },
+            "rotator8": {
+                "name": "Rotator 8", "min": 2, "max": 20
+            }
+        }};
+
+//Button event
     $('#main-nav a').on('click', function (e) {
 
-        $('#main-content').html(swig.renderFile('./views/' + $(this).data('name') + '.swig'));
+        var butName = $(this).data('name');
+        $('#main-content').html(swig.renderFile('./views/' + butName + '.swig', ((window[butName] != undefined) ? window[butName] : '')));
 
-    })
+    });
 
 }
 
